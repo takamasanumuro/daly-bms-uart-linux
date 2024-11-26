@@ -4,12 +4,20 @@
 #include <chrono> // Include chrono for timing
 #define CPPHTTPLIB_OPENSSL_SUPPORT
 #include "./libraries/cpp-httplib/httplib.h"
+#include "./libraries/line-protocol/LineProtocol.hpp"
 
+bool sendRequest(const char* url, int port, const char* data, InfluxDBContext dbContext) {
+    httplib::Client client(url, port);
+    std::string token = "Token " + std::string(dbContext.token);
+    httplib::Headers headers = {
+        {"Authorization", token}
+    };
 
-int main2(int argc, char **argv) {
-    httplib::SSLClient client("catfact.ninja");
-    client.enable_server_certificate_verification(true);
-    auto result = client.Get("/fact");
+    char write_path[256];
+    memset(write_path, 0, sizeof(write_path));;
+    buildInfluxWritePath(write_path, sizeof(write_path), dbContext.org, dbContext.bucket);//////
+
+    auto result = client.Post(write_path, headers, data, "application/octet-stream");
     if (result) {
         std::cout << result->status << std::endl;
         std::cout << result->body << std::endl;
@@ -17,18 +25,47 @@ int main2(int argc, char **argv) {
         auto err = result.error();
         std::cout << "Error: " << err << std::endl;
     }
-    return 0;
+}
+
+void sendMeasurementToInfluxDB(const char* url, int port) {
+	InfluxDBContext dbContext = {"Innoboat", "Innomaker", "gK8YfMaAl54lo2sgZLiM3Y5CQStHip-7mBe5vbhh1no86k72B4Hqo8Tj1qAL4Em-zGRUxGwBWLkQd1MR9foZ-g=="};
+	char line_protocol_data[256];
+    memset(line_protocol_data, 0, sizeof(line_protocol_data));
+	setBucket(line_protocol_data, dbContext.bucket);
+	addTag(line_protocol_data, "source", "BMS");
+    //generate random values
+    double value = 48 + (rand() % 6);
+    addField(line_protocol_data, "teste", value);
+	sendRequest(url, port, line_protocol_data, dbContext);
 }
 
 
-int main(int argc, char **argv) {
+
+int main(int argc, char** argv) {
+    if (argc < 3) {
+        std::cout << "Usage: " << argv[0] << " <url> <port>" << std::endl;
+        return -1;
+    }
+
+    srand(time(NULL));
+    while (true) {
+        auto start = std::chrono::high_resolution_clock::now(); // Start timing
+        sendMeasurementToInfluxDB(argv[1], atoi(argv[2]));
+        auto end = std::chrono::high_resolution_clock::now(); // End timing
+        std::chrono::duration<double, std::milli> elapsed = end - start; // Calculate elapsed time
+        std::cout << "Loop execution time: " << elapsed.count() << " ms" << std::endl;
+    }
+    return 0;
+}
+
+int main2(int argc, char** argv) {
     Daly_BMS_UART bms(argv[1]);
     bms.Init();
     
     while ( true ) {
         auto start = std::chrono::high_resolution_clock::now(); // Start timing
 
-        bms.update();
+        bool has_updated = bms.update();
 
         std::cout << "\033[0mbasic BMS Data:             \033[32;1m" << bms.get.packVoltage << " V," << bms.get.packCurrent << " A " << bms.get.packSOC << "\% " << std::endl;
         std::cout << "\033[0mPackage Temperature:        \033[32;1m" << bms.get.tempAverage << std::endl;
