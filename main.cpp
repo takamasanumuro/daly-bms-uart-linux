@@ -73,12 +73,12 @@ bool sendRequest(const char* url, int port, const char* data, InfluxDBContext db
     }
 }
 
-void sendMeasurementToInfluxDB(const char* url, int port, Daly_BMS_UART bms) {
+void sendMeasurementToInfluxDB(const char* url, int port, Daly_BMS_UART bms, const char* battery_name) {
 	InfluxDBContext dbContext = {"Innoboat", "Innomaker", "gK8YfMaAl54lo2sgZLiM3Y5CQStHip-7mBe5vbhh1no86k72B4Hqo8Tj1qAL4Em-zGRUxGwBWLkQd1MR9foZ-g=="};
 	char line_protocol_data[4096];
     memset(line_protocol_data, 0, sizeof(line_protocol_data));
 	setBucket(line_protocol_data, dbContext.bucket);
-	addTag(line_protocol_data, "source", "BMS");
+	addTag(line_protocol_data, "source", battery_name);
     addBMSDataToLineProtocol(line_protocol_data, bms);
 	sendRequest(url, port, line_protocol_data, dbContext);
 }
@@ -100,13 +100,21 @@ void printBMSInfo(Daly_BMS_UART bms) {
 int main(int argc, char** argv) {
 
     if (argc < 3) {
-        std::cout << "Usage: " << argv[0] << " <serial port> <influxdb url> <influxdb port>" << '\n';
+        std::cout << "Usage: " << argv[0] << " <serial_port> <battery_name> <url> <port>" << std::endl;
+        return -1;
+    }
+
+    //check number of args
+    if (argc < 5) {
+        printf("Too few arguments\n");
+        std::cout << "Usage: " << argv[0] << " <serial_port> <battery_name> <url> <port>" << std::endl;
         return -1;
     }
 
     const char* serial_port = argv[1];
-    const char* url = argv[2];
-    int port = atoi(argv[3]);
+    const char* battery_name = argv[2];
+    const char* url = argv[3];
+    int port = atoi(argv[4]);
 
     Daly_BMS_UART bms(serial_port);
     bms.Init();
@@ -115,7 +123,7 @@ int main(int argc, char** argv) {
         auto start = std::chrono::high_resolution_clock::now(); // Start timing
 
         bool has_updated = bms.update();
-        sendMeasurementToInfluxDB(url, port, bms);
+        sendMeasurementToInfluxDB(url, port, bms, battery_name);
         printBMSInfo(bms);
         auto end = std::chrono::high_resolution_clock::now(); // End timing
         std::chrono::duration<double, std::milli> elapsed = end - start; // Calculate elapsed time
