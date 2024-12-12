@@ -13,8 +13,8 @@ void addCellVoltagesToLineProtocol(char* line_protocol_data, Daly_BMS_UART bms) 
         return;
     }
 
-    char voltages[2048] = {0};
-    char buffer[256] = {0};
+    char voltages[4096] = {0};
+    char buffer[4096] = {0};
 
     for (int i = 0; i < bms.get.numberOfCells; i++) {
         char cellVoltage[32];
@@ -57,7 +57,7 @@ bool sendRequest(const char* url, int port, const char* data, InfluxDBContext db
         {"Connection", "keep-alive"},
     };
 
-    char write_path[256];
+    char write_path[4096];
     memset(write_path, 0, sizeof(write_path));;
     buildInfluxWritePath(write_path, sizeof(write_path), dbContext.org, dbContext.bucket);//////
 
@@ -65,15 +65,17 @@ bool sendRequest(const char* url, int port, const char* data, InfluxDBContext db
     if (result) {
         //std::cout << result->status << '\n';
         //std::cout << result->body << '\n';
+        return true;
     } else {
         auto err = result.error();
         std::cout << "Error: " << err << '\n';
+        return false;
     }
 }
 
 void sendMeasurementToInfluxDB(const char* url, int port, Daly_BMS_UART bms) {
 	InfluxDBContext dbContext = {"Innoboat", "Innomaker", "gK8YfMaAl54lo2sgZLiM3Y5CQStHip-7mBe5vbhh1no86k72B4Hqo8Tj1qAL4Em-zGRUxGwBWLkQd1MR9foZ-g=="};
-	char line_protocol_data[1024];
+	char line_protocol_data[4096];
     memset(line_protocol_data, 0, sizeof(line_protocol_data));
 	setBucket(line_protocol_data, dbContext.bucket);
 	addTag(line_protocol_data, "source", "BMS");
