@@ -32,7 +32,7 @@ void watchdog(int timeout_seconds) {
     }
 }
 
-void addCellVoltagesToLineProtocol(char* line_protocol_data, Daly_BMS_UART bms) {
+void addCellVoltagesToLineProtocol(char* line_protocol_data, Daly_BMS_UART bms, const char *prefix = "") {
     int numberOfCells = bms.get.numberOfCells;
     if (numberOfCells < 1 || numberOfCells > 48) {
         return;
@@ -45,31 +45,23 @@ void addCellVoltagesToLineProtocol(char* line_protocol_data, Daly_BMS_UART bms) 
         char cellVoltage[32];
         memset(cellVoltage, 0, sizeof(cellVoltage));
         sprintf(cellVoltage, "cellVoltage%d", i + 1);
-        addField(line_protocol_data, cellVoltage, bms.get.cellVmV[i] / 1000.0);
-        sprintf(buffer, "\033[0mCell Voltage %d: \033[32;1m%.3f\n", i + 1, bms.get.cellVmV[i] / 1000.0);
+        addField(line_protocol_data, std::string(prefix).append(cellVoltage).c_str(), bms.get.cellVmV[i] / 1000.0);
+        sprintf(buffer, "\033[0m%sCell Voltage %d: \033[32;1m%.3f\n", prefix, i + 1, bms.get.cellVmV[i] / 1000.0);
         strcat(voltages, buffer);
     }
 
     printf("%s", voltages);
 }
 
-void addBMSDataToLineProtocol(char* line_protocol_data, Daly_BMS_UART bms) {
-    addField(line_protocol_data, "packVoltage", bms.get.packVoltage);
-    addField(line_protocol_data, "packCurrent", bms.get.packCurrent);
-    addField(line_protocol_data, "packSOC", bms.get.packSOC);
-    addField(line_protocol_data, "tempAverage", bms.get.tempAverage);
-    addField(line_protocol_data, "maxCellmV", bms.get.maxCellmV);
-    addField(line_protocol_data, "maxCellVNum", bms.get.maxCellVNum);
-    addField(line_protocol_data, "minCellmV", bms.get.minCellmV);
-    addField(line_protocol_data, "minCellVNum", bms.get.minCellVNum);
-    addField(line_protocol_data, "numberOfCells", bms.get.numberOfCells);
-    addField(line_protocol_data, "numOfTempSensors", bms.get.numOfTempSensors);
-    addField(line_protocol_data, "bmsCycles", bms.get.bmsCycles);
-    addField(line_protocol_data, "bmsHeartBeat", bms.get.bmsHeartBeat);
-    addField(line_protocol_data, "disChargeFetState", bms.get.disChargeFetState);
-    addField(line_protocol_data, "chargeFetState", bms.get.chargeFetState);
-    addField(line_protocol_data, "resCapacitymAh", bms.get.resCapacitymAh);
-    addCellVoltagesToLineProtocol(line_protocol_data, bms);
+void addBMSDataToLineProtocol(char* line_protocol_data, Daly_BMS_UART bms, const char *prefix = "") {
+    addField(line_protocol_data, std::string(prefix).append("Voltage").c_str(), bms.get.packVoltage);
+    addField(line_protocol_data, std::string(prefix).append("Current").c_str(), bms.get.packCurrent);
+    addField(line_protocol_data, std::string(prefix).append("SOC").c_str(), bms.get.packSOC);
+    addField(line_protocol_data, std::string(prefix).append("AvgTemperature").c_str(), bms.get.tempAverage);
+    addField(line_protocol_data, std::string(prefix).append("DischargeFETState").c_str(), bms.get.disChargeFetState);
+    addField(line_protocol_data, std::string(prefix).append("ChargeFETState").c_str(), bms.get.chargeFetState);
+    addField(line_protocol_data, std::string(prefix).append("ResidualCapacitymAh").c_str(), bms.get.resCapacitymAh);
+    addCellVoltagesToLineProtocol(line_protocol_data, bms, prefix);
 }
 
 bool sendRequest(const char* url, int port, const char* data, InfluxDBContext dbContext) {
@@ -100,22 +92,25 @@ void sendMeasurementToInfluxDB(const char* url, int port, Daly_BMS_UART bms, con
     memset(line_protocol_data, 0, sizeof(line_protocol_data));
     setBucket(line_protocol_data, dbContext.bucket);
     addTag(line_protocol_data, "source", battery_name);
-    addBMSDataToLineProtocol(line_protocol_data, bms);
+    if (strcmp(battery_name, "bateria-bombordo") == 0) {
+        addBMSDataToLineProtocol(line_protocol_data, bms, "[BB]");
+    } else if (strcmp(battery_name, "bateria-boreste") == 0) {
+        addBMSDataToLineProtocol(line_protocol_data, bms, "[BO]");
+    } else {
+        addBMSDataToLineProtocol(line_protocol_data, bms, "");
+    }
     sendRequest(url, port, line_protocol_data, dbContext);
 }
 
-void printBMSInfo(Daly_BMS_UART bms) {
-    std::cout << "\033[0mbasic BMS Data:             \033[32;1m" << bms.get.packVoltage << "V, " << bms.get.packCurrent << "A, SOC " << bms.get.packSOC << "% " << '\n';
-    std::cout << "\033[0mPackage Temperature:        \033[32;1m" << bms.get.tempAverage << '\n';
-    std::cout << "\033[0mHighest Cell Voltage Nr:    \033[32;1m" << bms.get.maxCellVNum << " with voltage " << (bms.get.maxCellmV / 1000.0) << '\n';
-    std::cout << "\033[0mLowest Cell Voltage Nr:     \033[32;1m" << bms.get.minCellVNum << " with voltage " << (bms.get.minCellmV / 1000.0) << '\n';
-    std::cout << "\033[0mNumber of Cells:            \033[32;1m" << bms.get.numberOfCells << '\n';
-    std::cout << "\033[0mNumber of Temp Sensors:     \033[32;1m" << bms.get.numOfTempSensors << '\n';
-    std::cout << "\033[0mBMS Chrg / Dischrg Cycles:  \033[32;1m" << bms.get.bmsCycles << '\n';
-    std::cout << "\033[0mBMS Heartbeat:              \033[32;1m" << bms.get.bmsHeartBeat << '\n';
-    std::cout << "\033[0mDischarge MOSFet Status:    \033[32;1m" << bms.get.disChargeFetState << '\n';
-    std::cout << "\033[0mCharge MOSFet Status:       \033[32;1m" << bms.get.chargeFetState << '\n';
-    std::cout << "\033[0mRemaining Capacity mAh:     \033[32;1m" << bms.get.resCapacitymAh << '\n';
+void printBMSInfo(Daly_BMS_UART bms, const char* battery_name) {
+    std::cout << "\033[0mBattery Name: \033[32;1m" << battery_name << '\n';
+    std::cout << "\033[0mBMS Data: \033[32;1m" << bms.get.packVoltage << "V, " << bms.get.packCurrent << "A, SOC " << bms.get.packSOC << "% " << '\n';
+    std::cout << "\033[0mTemperature: \033[32;1m" << bms.get.tempAverage << '\n';
+    std::cout << "\033[0mHighest Cell Voltage: \033[32;1m" << bms.get.maxCellVNum << " with voltage " << (bms.get.maxCellmV / 1000.0) << '\n';
+    std::cout << "\033[0mLowest Cell Voltage: \033[32;1m" << bms.get.minCellVNum << " with voltage " << (bms.get.minCellmV / 1000.0) << '\n';
+    std::cout << "\033[0mDischarge FET Status: \033[32;1m" << bms.get.disChargeFetState << '\n';
+    std::cout << "\033[0mCharge FET Status: \033[32;1m" << bms.get.chargeFetState << '\n';
+    std::cout << "\033[0mRemaining Capacity mAh: \033[32;1m" << bms.get.resCapacitymAh << '\n';
 }
 
 int main(int argc, char** argv) {
@@ -149,7 +144,7 @@ int main(int argc, char** argv) {
         }
 
         sendMeasurementToInfluxDB(url, port, bms, battery_name);
-        printBMSInfo(bms);
+        printBMSInfo(bms, battery_name);
 
         auto end = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double, std::milli> elapsed = end - start;
