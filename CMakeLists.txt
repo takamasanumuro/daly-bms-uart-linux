@@ -14,7 +14,7 @@ file(GLOB LIB_SOURCES "libraries/line-protocol/*.cpp" "libraries/line-protocol/*
 
 add_library(line-protocol STATIC ${LIB_SOURCES})
 
-add_executable(${PROJECT_NAME} main.cpp daly-bms-uart.cpp daly-bms-uart.h)
+add_executable(${PROJECT_NAME} main.cpp daly-bms-uart.cpp daly-bms-uart.h request.cpp request.h)
 
 target_link_libraries(${PROJECT_NAME} PUBLIC
         line-protocol

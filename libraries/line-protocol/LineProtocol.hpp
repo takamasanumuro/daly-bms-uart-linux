@@ -1,3 +1,4 @@
+#pragma once
 #include "stdio.h"
 #include "string.h"
 #include "stdbool.h"
@@ -10,7 +11,7 @@ typedef struct _InfluxDBContext {
     char token[128];
 } InfluxDBContext;
 
-void setBucket(char* buffer, const char* bucket);
+void setMeasurement(char* buffer, const char* bucket);
 void addTag(char* buffer, const char* tagKey, const char* tagValue);
 void addField(char* buffer, const char* fieldKey, double fieldValue);
 long getEpochSeconds();

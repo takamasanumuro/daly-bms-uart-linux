@@ -5,9 +5,11 @@
 #include <thread>
 #include <atomic>
 #include <csignal>
+#include <cstdlib>
+#include "line-protocol/LineProtocol.hpp"
+#include "request.h"
 //#define CPPHTTPLIB_OPENSSL_SUPPORT
-#include "./libraries/cpp-httplib/httplib.h"
-#include "./libraries/line-protocol/LineProtocol.hpp"
+
 
 // Shared atomic variable for watchdog
 std::atomic<std::chrono::steady_clock::time_point> last_update_time;
@@ -64,46 +66,24 @@ void addBMSDataToLineProtocol(char* line_protocol_data, Daly_BMS_UART bms, const
     addCellVoltagesToLineProtocol(line_protocol_data, bms, prefix);
 }
 
-bool sendRequest(const char* url, int port, const char* data, InfluxDBContext dbContext) {
-    httplib::Client client(url, port);
-    std::string token = "Token " + std::string(dbContext.token);
-    httplib::Headers headers = {
-        {"Authorization", token},
-        {"Connection", "keep-alive"},
-    };
 
-    char write_path[4096];
-    memset(write_path, 0, sizeof(write_path));
-    buildInfluxWritePath(write_path, sizeof(write_path), dbContext.org, dbContext.bucket);
 
-    auto result = client.Post(write_path, headers, data, "application/octet-stream");
-    if (result) {
-        return true;
-    } else {
-        auto err = result.error();
-        std::cout << "Error: " << err << '\n';
-        return false;
-    }
-}
-
-void sendMeasurementToInfluxDB(const char* url, int port, Daly_BMS_UART bms, const char* battery_name) {
-    InfluxDBContext dbContext = {"Innoboat", "Innomaker", "gK8YfMaAl54lo2sgZLiM3Y5CQStHip-7mBe5vbhh1no86k72B4Hqo8Tj1qAL4Em-zGRUxGwBWLkQd1MR9foZ-g=="};
-    char line_protocol_data[4096];
-    memset(line_protocol_data, 0, sizeof(line_protocol_data));
-    setBucket(line_protocol_data, dbContext.bucket);
-    addTag(line_protocol_data, "source", battery_name);
-    if (strcmp(battery_name, "bateria-bombordo") == 0) {
+void sendMeasurementToInfluxDB(Daly_BMS_UART bms, const char* url, int port, const char* bucket, const char* battery_side = "") {
+    
+    char line_protocol_data[4096] = {0};
+    setMeasurement(line_protocol_data, "battery");
+    if (strcmp(battery_side, "bateria-bombordo") == 0) {
         addBMSDataToLineProtocol(line_protocol_data, bms, "[BB]");
-    } else if (strcmp(battery_name, "bateria-boreste") == 0) {
+    } else if (strcmp(battery_side, "bateria-boreste") == 0) {
         addBMSDataToLineProtocol(line_protocol_data, bms, "[BO]");
     } else {
         addBMSDataToLineProtocol(line_protocol_data, bms, "");
     }
-    sendRequest(url, port, line_protocol_data, dbContext);
+    sendRequest(url, port, line_protocol_data, bucket);
 }
 
-void printBMSInfo(Daly_BMS_UART bms, const char* battery_name) {
-    std::cout << "\033[0mBattery Name: \033[32;1m" << battery_name << '\n';
+void printBMSInfo(Daly_BMS_UART bms, const char* battery_side) {
+    std::cout << "\033[0mBattery Name: \033[32;1m" << battery_side << '\n';
     std::cout << "\033[0mBMS Data: \033[32;1m" << bms.get.packVoltage << "V, " << bms.get.packCurrent << "A, SOC " << bms.get.packSOC << "% " << '\n';
     std::cout << "\033[0mTemperature: \033[32;1m" << bms.get.tempAverage << '\n';
     std::cout << "\033[0mHighest Cell Voltage: \033[32;1m" << bms.get.maxCellVNum << " with voltage " << (bms.get.maxCellmV / 1000.0) << '\n';
@@ -115,14 +95,15 @@ void printBMSInfo(Daly_BMS_UART bms, const char* battery_name) {
 
 int main(int argc, char** argv) {
     if (argc < 5) {
-        std::cout << "Usage: " << argv[0] << " <serial_port> <battery_name> <url> <port>" << std::endl;
+        std::cout << "Usage: " << argv[0] << " <serial_port> <url> <port> <bucket> [battery_side]" << std::endl;
         return -1;
     }
 
     const char* serial_port = argv[1];
-    const char* battery_name = argv[2];
-    const char* url = argv[3];
-    int port = std::stoi(argv[4]);
+    const char* url = argv[2];
+    int port = std::stoi(argv[3]);
+    const char* bucket = argv[4];
+    const char* battery_side = (argc >= 6) ? argv[5] : "";
 
     // Set up signal handler
     std::signal(SIGTERM, signalHandler);
@@ -143,8 +124,8 @@ int main(int argc, char** argv) {
             continue;
         }
 
-        sendMeasurementToInfluxDB(url, port, bms, battery_name);
-        printBMSInfo(bms, battery_name);
+        sendMeasurementToInfluxDB(bms, url, port, bucket, battery_side);
+        printBMSInfo(bms, battery_side);
 
         auto end = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double, std::milli> elapsed = end - start;

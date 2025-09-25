@@ -4,7 +4,7 @@
 
 
 
-void setBucket(char* buffer, const char* bucket) {
+void setMeasurement(char* buffer, const char* bucket) {
     sprintf(buffer, "%s", bucket);
 }
 
@@ -107,7 +107,7 @@ int line_protocol_test() {
     char fieldKey[10] = "value";
     double fieldValue = 10.0;
 
-    setBucket(buffer, bucket);
+    setMeasurement(buffer, bucket);
     addTag(buffer, tagKey, tagValue);
     addTag(buffer, "source", "instrumentacao");
     addField(buffer, fieldKey, fieldValue);
