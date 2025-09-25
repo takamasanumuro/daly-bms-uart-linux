@@ -5,7 +5,7 @@
 #include <thread>
 #include <atomic>
 #include <csignal>
-#define CPPHTTPLIB_OPENSSL_SUPPORT
+//#define CPPHTTPLIB_OPENSSL_SUPPORT
 #include "./libraries/cpp-httplib/httplib.h"
 #include "./libraries/line-protocol/LineProtocol.hpp"
 

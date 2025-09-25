@@ -18,6 +18,7 @@ add_executable(${PROJECT_NAME} main.cpp daly-bms-uart.cpp daly-bms-uart.h)
 
 target_link_libraries(${PROJECT_NAME} PUBLIC
         line-protocol
+        atomic
         $<$<BOOL:${HTTPLIB_IS_USING_OPENSSL}>:OpenSSL::SSL>
         $<$<BOOL:${HTTPLIB_IS_USING_OPENSSL}>:OpenSSL::Crypto>)
 

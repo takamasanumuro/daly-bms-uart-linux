@@ -556,6 +556,14 @@ void Daly_BMS_UART::sendCommand(COMMAND cmdID)
     DEBUG_SERIAL.print(" Checksum = 0x");
     DEBUG_SERIAL.println(checksum, HEX);
 #endif
+    #ifdef DEBUG_DALY
+    char buffer[1024] = {0};
+    for (int i = 0; i < XFER_BUFFER_LENGTH; i++)
+    {
+        sprintf(buffer + strlen(buffer), "0x%02X ", this->my_txBuffer[i]);
+    }
+    printf("TX: %s\n", buffer);
+    #endif
     write(this->my_serialIntf, this->my_txBuffer, XFER_BUFFER_LENGTH);
 }
 
